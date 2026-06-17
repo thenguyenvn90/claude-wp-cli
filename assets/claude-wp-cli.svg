@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="claude-wp-cli: Claude Code on your machine translates natural-language prompts into CLI commands that call the WordPress REST API over the internet to manage posts and pages, the media library, and categories and tags on any WordPress site — no plugin, multi-site.">
+<title>claude-wp-cli: manage WordPress from Claude Code via the REST API</title>
+<defs>
+<filter id="g" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="3"/></filter>
+<filter id="au" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="64"/></filter>
+<radialGradient id="aO" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FF7F00" stop-opacity="0.30"/><stop offset="100%" stop-color="#FF7F00" stop-opacity="0"/></radialGradient>
+<radialGradient id="aG" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#10b981" stop-opacity="0.26"/><stop offset="100%" stop-color="#10b981" stop-opacity="0"/></radialGradient>
+<radialGradient id="hubG" cx="50%" cy="40%" r="70%"><stop offset="0%" stop-color="#3b2a12"/><stop offset="100%" stop-color="#1a1407"/></radialGradient>
+<style>.l{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.glow{animation:gl 2.4s ease-in-out infinite}@keyframes gl{0%,100%{opacity:0}50%{opacity:.9}}
+@media (prefers-reduced-motion:reduce){.glow{animation:none}.dot{display:none}}</style>
+</defs>
+
+<rect width="1200" height="420" rx="18" fill="#0A1426"/>
+<g filter="url(#au)"><ellipse cx="230" cy="230" rx="280" ry="180" fill="url(#aO)"/><ellipse cx="970" cy="240" rx="300" ry="190" fill="url(#aG)"/></g>
+
+<text x="600" y="38" text-anchor="middle" font-size="20" font-weight="800" fill="#F1F5F9" class="l">claude-wp-cli — manage WordPress from Claude Code</text>
+<text x="600" y="62" text-anchor="middle" font-size="12.5" fill="#94a3b8" class="l">Natural-language prompts → WordPress REST API · no plugin · multi-site</text>
+
+<g stroke="#33415c" stroke-width="1.2" stroke-dasharray="5 6" opacity="0.55"><line x1="415" y1="90" x2="415" y2="376"/><line x1="805" y1="90" x2="805" y2="376"/></g>
+<g class="l" font-size="12.5" font-weight="700" fill="#cbd5e1" text-anchor="middle"><text x="210" y="100">Your Machine</text><text x="610" y="100">Internet</text><text x="1000" y="100">WordPress Site</text></g>
+
+<defs>
+<path id="main" d="M325,262 L831,262" fill="none"/>
+<path id="f1" d="M905,294 L690,320" fill="none"/>
+<path id="f2" d="M970,294 L870,320" fill="none"/>
+<path id="f3" d="M1035,294 L1068,320" fill="none"/>
+</defs>
+<use href="#main" stroke="#FF7F00" stroke-width="2" opacity="0.35"/>
+<path d="M831,262 l-12,-6 v12 z" fill="#FF7F00" opacity="0.7"/>
+<text x="600" y="250" text-anchor="middle" font-size="11.5" fill="#94a3b8" class="l">REST API calls</text>
+<g stroke="#10b981" stroke-width="1.6" fill="none" opacity="0.32"><use href="#f1"/><use href="#f2"/><use href="#f3"/></g>
+
+<g class="l">
+<rect x="95" y="120" width="230" height="64" rx="12" fill="#12233f" stroke="#2f4a73" stroke-width="1.4"/>
+<text x="210" y="159" text-anchor="middle" font-size="15" font-weight="800" fill="#F1F5F9">&gt;_ Claude Code</text>
+<path id="down" d="M210,184 L210,226" fill="none"/>
+<use href="#down" stroke="#FF7F00" stroke-width="2" opacity="0.4"/>
+<path d="M210,228 l-6,-12 h12 z" fill="#FF7F00" opacity="0.7"/>
+
+<rect x="95" y="230" width="230" height="64" rx="12" fill="url(#hubG)" stroke="#FF7F00" stroke-width="2.2"/>
+<rect x="95" y="230" width="230" height="64" rx="12" fill="none" stroke="#FF7F00" stroke-width="2.4" filter="url(#g)" class="glow"/>
+<text x="210" y="261" text-anchor="middle" font-size="15" font-weight="800" fill="#FF9D33">claude-wp-cli</text>
+<text x="210" y="281" text-anchor="middle" font-size="10.5" fill="#94a3b8">Python CLI tool</text>
+
+<rect x="835" y="230" width="270" height="64" rx="12" fill="#0c2a22" stroke="#10b981" stroke-width="1.8"/>
+<text x="970" y="261" text-anchor="middle" font-size="14" font-weight="800" fill="#34d399">WordPress REST API</text>
+<text x="970" y="281" text-anchor="middle" font-size="10.5" fill="#94a3b8">core WP · Application Password</text>
+
+<g font-size="12" font-weight="700" fill="#a7f3d0" text-anchor="middle">
+<rect x="605" y="320" width="165" height="48" rx="10" fill="#0c2a22" stroke="#1f6f57" stroke-width="1.3"/><text x="687" y="349">Posts &amp; Pages</text>
+<rect x="790" y="320" width="160" height="48" rx="10" fill="#0c2a22" stroke="#1f6f57" stroke-width="1.3"/><text x="870" y="349">Media Library</text>
+<rect x="970" y="320" width="200" height="48" rx="10" fill="#0c2a22" stroke="#1f6f57" stroke-width="1.3"/><text x="1070" y="349">Categories &amp; Tags</text>
+</g>
+</g>
+
+<g class="l" font-size="10.5" font-weight="600" text-anchor="middle">
+<rect x="60" y="384" width="320" height="28" rx="8" fill="none" stroke="#FB9B3C" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.85"/>
+<text x="220" y="402" fill="#FB9B3C">Works with ANY WordPress site — no plugin needed</text>
+<rect x="820" y="384" width="320" height="28" rx="8" fill="none" stroke="#34d399" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.85"/>
+<text x="980" y="402" fill="#6ee7b7">Manage multiple sites from one setup</text>
+</g>
+
+<g fill="#FF9D33" filter="url(#g)" class="dot">
+<circle r="5"><animateMotion dur="1.2s" repeatCount="indefinite" begin="0s"><mpath href="#main"/></animateMotion></circle>
+<circle r="5"><animateMotion dur="1.2s" repeatCount="indefinite" begin="0.6s"><mpath href="#main"/></animateMotion></circle>
+</g>
+<g fill="#34d399" filter="url(#g)" class="dot">
+<circle r="4"><animateMotion dur="1.2s" repeatCount="indefinite" begin="0s"><mpath href="#f1"/></animateMotion></circle>
+<circle r="4"><animateMotion dur="1.2s" repeatCount="indefinite" begin="0.4s"><mpath href="#f2"/></animateMotion></circle>
+<circle r="4"><animateMotion dur="1.2s" repeatCount="indefinite" begin="0.8s"><mpath href="#f3"/></animateMotion></circle>
+</g>
+</svg>

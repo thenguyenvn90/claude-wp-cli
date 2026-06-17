@@ -1,4 +1,6 @@
-# wp-cli
+# claude-wp-cli
+
+![claude-wp-cli — manage WordPress from Claude Code via the REST API](assets/claude-wp-cli.svg)
 
 A Claude Code skill that provides complete WordPress content management through the REST API. Manage posts, pages, media, categories, tags, ACF custom fields, and structured data (JSON-LD schema) across multiple WordPress sites -- all from the command line. Content is authored in markdown files and automatically converted to HTML or Gutenberg block markup before publishing.
 
