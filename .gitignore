@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+.env
+
+# Per-site real configs — NEVER commit credentials
+/sites/
+*.env.site
+**/wp-auth.json
+
+# Local MCP / auth config
+.mcp.json
+
+# OS / editor
+.DS_Store
+Thumbs.db

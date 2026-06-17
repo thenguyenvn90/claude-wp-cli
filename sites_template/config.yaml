@@ -1,0 +1,15 @@
+# WordPress CLI Site Configuration
+# Copy this folder to create a new site: cp -r _template my-site-id
+
+site_id: "example-site"
+site_url: "https://www.example.com"
+
+wordpress:
+  site_url: "https://www.example.com"
+  default_status: "draft"
+  editor_type: "classic"       # classic | gutenberg
+  seo_plugin: "none"           # rankmath | yoast | generic | none
+  default_category_ids: []
+  default_tag_ids: []
+  default_author_id: null
+  timeout: 30

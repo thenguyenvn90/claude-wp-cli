@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wp-cli"
+version = "1.0.0"
+description = "WordPress management CLI for Claude Code"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "markdown>=3.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "respx>=0.21",
+    "pytest-cov>=4.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["cli*", "client*", "converter*", "models*"]
+
+[project.scripts]
+wp-cli = "cli.main:main"
