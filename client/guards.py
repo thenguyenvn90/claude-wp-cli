@@ -128,3 +128,11 @@ def strip_meta_comment(html: str) -> str:
         "", head, count=1, flags=re.DOTALL | re.IGNORECASE,
     )
     return (head + tail).lstrip("\n")
+
+
+def strip_body_h1(html: str) -> str:
+    """Remove every <h1>…</h1> from the body. WordPress renders the post TITLE as the page's
+    <h1>, so a body H1 ships a duplicate H1 (an SEO + accessibility defect). The markdown source
+    keeps its `# Title`; only the rendered body POSTed to WP is cleaned. (Ported from the kit's
+    blog-publish wp_push_safe.strip_body_h1 so the publish path keeps enforcing it.)"""
+    return re.sub(r"<h1\b[^>]*>.*?</h1>\s*", "", html, flags=re.DOTALL | re.IGNORECASE).lstrip("\n")

@@ -138,7 +138,9 @@ class PostsClient:
                 f"raw-markdown leak detected: {fails}. Convert markdown to HTML first, "
                 "or pass force=True if intentional.")}
 
-        payload: dict[str, Any] = {"content": guards.strip_meta_comment(content_html)}
+        # strip the leading "Meta description:" artifact AND any body <h1> (WP renders the title
+        # as the page H1 — a body H1 is a duplicate). Matches the kit's legacy push behavior.
+        payload: dict[str, Any] = {"content": guards.strip_body_h1(guards.strip_meta_comment(content_html))}
         if status:
             payload["status"] = status
         data = self._client.post(f"{post_type}/{post_id}", json=payload)

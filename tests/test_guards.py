@@ -4,7 +4,17 @@ from client.guards import (
     detect_md_leak,
     strip_em_dashes,
     strip_meta_comment,
+    strip_body_h1,
 )
+
+
+def test_strip_body_h1_removes_all_h1():
+    assert strip_body_h1("<h1>Title</h1>\n<p>body</p>") == "<p>body</p>"
+    assert strip_body_h1('<h1 class="x">A</h1><h2>B</h2><h1>C</h1>') == "<h2>B</h2>"
+
+
+def test_strip_body_h1_noop_without_h1():
+    assert strip_body_h1("<h2>Sec</h2><p>body</p>") == "<h2>Sec</h2><p>body</p>"
 
 
 # --------------------------------------------------------------------------- #
