@@ -22,6 +22,9 @@ def register(subparsers):
     p.add_argument("--alt-text", default=None)
     p.add_argument("--caption", default=None)
     p.add_argument("--title", default=None)
+    p.add_argument("--filename", default=None, help="override the upload filename")
+    p.add_argument("--featured", type=int, default=None, metavar="POST_ID",
+                   help="also set the uploaded media as this post's featured image")
 
     p = sub.add_parser("delete")
     p.add_argument("--id", type=int, required=True)
@@ -39,7 +42,11 @@ def handle(args, client: WPClient, config):
     elif args.action == "get":
         print(json_output(media.get(args.id)))
     elif args.action == "upload":
-        data = media.upload(args.file, alt_text=args.alt_text, caption=args.caption, title=args.title)
+        data = media.upload(args.file, alt_text=args.alt_text, caption=args.caption,
+                            title=args.title, filename=args.filename)
+        if args.featured is not None and data.get("id"):
+            media.set_featured(args.featured, data["id"])
+            data["featured_set_on"] = args.featured
         print(json_output(data))
     elif args.action == "delete":
         print(json_output(media.delete(args.id, force=args.force)))
