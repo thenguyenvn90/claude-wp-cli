@@ -112,11 +112,17 @@ class PostsClient:
     def push_safe(self, post_id: int, content_html: str, *, expected_slug: Optional[str] = None,
                   force: bool = False, strip_emdash: bool = True, check_drift_enabled: bool = True,
                   allow_drift: bool = False, status: Optional[str] = None,
-                  post_type: str = "posts") -> dict:
+                  post_type: str = "posts", expected_modified: Optional[str] = None) -> dict:
         """Guarded content push. Returns a structured result; never raises on a guard refusal.
 
-        Order: slug-guard -> em-dash strip -> drift check -> markdown-leak -> meta-comment
-        strip -> POST. Mirrors the kit's wp_push_safe.push_content behavior.
+        Order: slug-guard -> em-dash strip -> drift check -> stale-edit (modified) check ->
+        markdown-leak -> meta-comment strip -> POST -> post-write slug re-verify. Mirrors the
+        kit's wp_push_safe.push_content behavior.
+
+        expected_modified: the `modified` timestamp captured at fetch-time. If the live post's
+        `modified` changed since then, an external edit landed in between — refuse so concurrent
+        editorial work is never silently overwritten (closes the TOCTOU window a char-count-only
+        drift check misses).
         """
         if expected_slug:
             ok, _actual, msg = self.verify_slug(post_id, expected_slug, post_type=post_type)
@@ -132,6 +138,20 @@ class PostsClient:
             if not ok:
                 return {"pushed": False, "refused": msg}
 
+        # Stale-edit guard (TOCTOU): refuse if the post changed since it was fetched, even when
+        # the char-count drift looks small (equal-length external edits would slip through otherwise).
+        if expected_modified and not allow_drift:
+            try:
+                cur = self._client.get(f"{post_type}/{post_id}",
+                                       params={"context": "edit", "_fields": "id,modified"})
+            except WPAPIError as e:
+                return {"pushed": False, "refused": f"could not re-check 'modified' before push: {e}"}
+            live_modified = cur.get("modified")
+            if live_modified and live_modified != expected_modified:
+                return {"pushed": False, "refused": (
+                    f"stale edit: post was modified at {live_modified} after you fetched it "
+                    f"({expected_modified}). Re-fetch + reconcile, or pass allow_drift to override.")}
+
         fails = guards.detect_md_leak(content_html)
         if fails and not force:
             return {"pushed": False, "refused": (
@@ -144,6 +164,17 @@ class PostsClient:
         if status:
             payload["status"] = status
         data = self._client.post(f"{post_type}/{post_id}", json=payload)
-        return {"pushed": True, "id": data.get("id"), "modified": data.get("modified"),
-                "link": data.get("link"), "status": data.get("status"),
-                "em_dashes_stripped": em_count}
+
+        result: dict[str, Any] = {
+            "pushed": True, "id": data.get("id"), "modified": data.get("modified"),
+            "link": data.get("link"), "status": data.get("status"),
+            "em_dashes_stripped": em_count,
+        }
+        # Post-write confirmation: re-verify the slug we just wrote is the one we intended, so a
+        # wrong --id is detectable after the fact (CWE-807 — don't blindly trust the write target).
+        if expected_slug:
+            ok, actual, _msg = self.verify_slug(post_id, expected_slug, post_type=post_type)
+            result["slug_verified"] = ok
+            if not ok:
+                result["warning"] = f"post-write slug check: expected {expected_slug!r}, got {actual!r}"
+        return result

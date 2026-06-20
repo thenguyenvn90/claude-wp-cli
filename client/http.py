@@ -6,6 +6,8 @@ All errors are captured and converted to structured JSON.
 
 import base64
 import json
+import re
+import time
 from typing import Any, Optional
 
 import httpx
@@ -18,6 +20,21 @@ WP_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
+
+# Cap the response body we will parse — a hostile/compromised endpoint could otherwise
+# return a multi-GB body and exhaust memory (CWE-400).
+MAX_RESPONSE_BYTES = 25 * 1024 * 1024  # 25 MB
+
+# Transient upstream statuses worth a small bounded retry with backoff.
+_RETRY_STATUS = {429, 502, 503, 504}
+_MAX_RETRIES = 2
+
+# Mask any Basic-auth token that might surface in an error body/message (CWE-532).
+_SECRET_RE = re.compile(r"Basic\s+[A-Za-z0-9+/=]{8,}", re.IGNORECASE)
+
+
+def _redact(text: str) -> str:
+    return _SECRET_RE.sub("Basic ****", text or "")
 
 
 class WPAPIError(Exception):
@@ -75,7 +92,14 @@ class WPClient:
             "Content-Type": "application/json",
             "User-Agent": WP_USER_AGENT,
         }
-        self._client = httpx.Client(timeout=self._timeout, headers=self._headers)
+        # trust_env=False: ignore HTTP(S)_PROXY / NO_PROXY / .netrc so a hostile proxy
+        # env var cannot route the Basic-auth header through an attacker (CWE-918).
+        # follow_redirects=False: never replay the Authorization header to a redirected
+        # (possibly cross-host) URL.
+        self._client = httpx.Client(
+            timeout=self._timeout, headers=self._headers,
+            trust_env=False, follow_redirects=False,
+        )
 
     def close(self):
         self._client.close()
@@ -89,47 +113,66 @@ class WPClient:
     def _url(self, endpoint: str) -> str:
         return f"{self._base_url}/{endpoint.lstrip('/')}"
 
+    def _send(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """Issue a request with a bounded retry + backoff on transient upstream errors."""
+        resp = None
+        for attempt in range(_MAX_RETRIES + 1):
+            resp = self._client.request(method.upper(), url, **kwargs)
+            if resp.status_code in _RETRY_STATUS and attempt < _MAX_RETRIES:
+                retry_after = resp.headers.get("Retry-After")
+                try:
+                    wait = float(retry_after) if retry_after else float(2 ** attempt)
+                except ValueError:
+                    wait = float(2 ** attempt)
+                time.sleep(min(wait, 10.0))
+                continue
+            return resp
+        return resp
+
     def _handle_error(self, resp: httpx.Response) -> None:
         if resp.status_code >= 400:
             try:
                 body = resp.json()
                 code = body.get("code", "unknown_error")
-                message = body.get("message", resp.text[:200])
+                message = body.get("message", "")
             except Exception:
                 code = "unknown_error"
-                message = resp.text[:200]
-            raise WPAPIError(code, message, resp.status_code)
+                message = ""
+            if not message:
+                # Don't echo a raw WAF/HTML error body (info disclosure) — summarise it.
+                message = f"HTTP {resp.status_code} (non-JSON body, {len(resp.content)} bytes)"
+            raise WPAPIError(code, _redact(message)[:300], resp.status_code)
+
+    def _finish(self, resp: httpx.Response) -> Any:
+        """Shared post-flight: error check, size guard, then parse JSON."""
+        self._handle_error(resp)
+        if len(resp.content) > MAX_RESPONSE_BYTES:
+            raise WPAPIError("response_too_large",
+                             f"response body exceeds {MAX_RESPONSE_BYTES} bytes", resp.status_code)
+        return resp.json()
 
     def get(self, endpoint: str, *, params: Optional[dict] = None) -> Any:
-        resp = self._client.get(self._url(endpoint), params=params)
-        self._handle_error(resp)
-        return resp.json()
+        return self._finish(self._send("GET", self._url(endpoint), params=params))
 
     def get_list(self, endpoint: str, *, params: Optional[dict] = None) -> tuple[list, int, int]:
-        resp = self._client.get(self._url(endpoint), params=params)
-        self._handle_error(resp)
+        resp = self._send("GET", self._url(endpoint), params=params)
+        data = self._finish(resp)
         total = int(resp.headers.get("X-WP-Total", 0))
         total_pages = int(resp.headers.get("X-WP-TotalPages", 0))
-        return resp.json(), total, total_pages
+        return data, total, total_pages
 
     def post(self, endpoint: str, *, json: Optional[dict] = None, **kwargs) -> Any:
-        resp = self._client.post(self._url(endpoint), json=json, **kwargs)
-        self._handle_error(resp)
-        return resp.json()
+        return self._finish(self._send("POST", self._url(endpoint), json=json, **kwargs))
 
     def post_file(self, endpoint: str, *, file_data: bytes, filename: str, content_type: str) -> Any:
         headers = {
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Type": content_type,
         }
-        resp = self._client.post(self._url(endpoint), headers=headers, content=file_data)
-        self._handle_error(resp)
-        return resp.json()
+        return self._finish(self._send("POST", self._url(endpoint), headers=headers, content=file_data))
 
     def delete(self, endpoint: str, *, params: Optional[dict] = None) -> Any:
-        resp = self._client.delete(self._url(endpoint), params=params)
-        self._handle_error(resp)
-        return resp.json()
+        return self._finish(self._send("DELETE", self._url(endpoint), params=params))
 
     def request_path(self, method: str, path: str, *, json: Optional[dict] = None,
                      params: Optional[dict] = None) -> Any:
@@ -140,6 +183,4 @@ class WPClient:
         """
         site_root = self._base_url.split("/wp-json")[0]
         url = f"{site_root}/{path.lstrip('/')}"
-        resp = self._client.request(method.upper(), url, json=json, params=params)
-        self._handle_error(resp)
-        return resp.json()
+        return self._finish(self._send(method, url, json=json, params=params))

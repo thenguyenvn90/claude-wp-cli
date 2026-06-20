@@ -4,6 +4,7 @@ import mimetypes
 from pathlib import Path
 from typing import Optional
 from .http import WPClient
+from .guards import safe_read_bytes
 
 # Explicit map first — mimetypes.guess_type is unreliable for webp/avif on some
 # Windows installs and would yield application/octet-stream (which WP rejects).
@@ -14,8 +15,15 @@ CONTENT_TYPES = {
 }
 
 
-def _content_type(path: Path) -> str:
+def _content_type(path: Path, *, allow_svg: bool = False) -> str:
     ext = path.suffix.lower()
+    if ext == ".svg" and not allow_svg:
+        # SVG can carry <script>/onload payloads → stored XSS once served from the WP
+        # origin. Refuse by default; require an explicit opt-in (CWE-434).
+        raise ValueError(
+            "SVG upload is disabled (it can carry stored-XSS payloads). "
+            "Re-run with --allow-svg if you trust this file."
+        )
     if ext in CONTENT_TYPES:
         return CONTENT_TYPES[ext]
     return mimetypes.guess_type(str(path))[0] or "application/octet-stream"
@@ -36,12 +44,12 @@ class MediaClient:
         return self._client.get(f"media/{media_id}")
 
     def upload(self, file_path: str, *, alt_text: Optional[str] = None, caption: Optional[str] = None,
-               title: Optional[str] = None, filename: Optional[str] = None) -> dict:
+               title: Optional[str] = None, filename: Optional[str] = None, allow_svg: bool = False) -> dict:
         path = Path(file_path)
-        if not path.is_file():
-            raise FileNotFoundError(f"Media file not found: {file_path}")
-        data = self._client.post_file("media", file_data=path.read_bytes(),
-                                      filename=filename or path.name, content_type=_content_type(path))
+        content_type = _content_type(path, allow_svg=allow_svg)  # raises on disallowed SVG
+        file_bytes = safe_read_bytes(file_path)  # size-capped; raises FileNotFoundError/FileTooLargeError
+        data = self._client.post_file("media", file_data=file_bytes,
+                                      filename=filename or path.name, content_type=content_type)
         update_payload: dict = {}
         if alt_text:
             update_payload["alt_text"] = alt_text

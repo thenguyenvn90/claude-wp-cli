@@ -7,6 +7,11 @@ import markdown as md_lib
 
 
 def markdown_to_html(md_text: str) -> str:
+    # NOTE: raw HTML in the markdown source is passed through (Python-Markdown does not strip it).
+    # That is intentional — authors embed Gutenberg/HTML blocks. WordPress sanitizes post content
+    # server-side for any account WITHOUT the `unfiltered_html` capability, so untrusted markdown
+    # cannot inject stored XSS on a normal (non-admin-single-site) account. If you feed UNTRUSTED
+    # markdown while authenticated as an unfiltered_html user, sanitize first (e.g. bleach).
     return md_lib.markdown(md_text, extensions=["fenced_code", "tables", "attr_list"])
 
 

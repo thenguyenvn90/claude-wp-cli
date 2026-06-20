@@ -2,6 +2,7 @@
 
 from client.http import WPClient, json_output
 from client.menus import MenusClient
+from ._safety import add_destructive_flags, confirm_or_exit
 
 
 def register(subparsers):
@@ -20,6 +21,7 @@ def register(subparsers):
 
     p = sub.add_parser("delete")
     p.add_argument("--id", type=int, required=True)
+    add_destructive_flags(p)
 
     p = sub.add_parser("items")
     p.add_argument("--menu-id", type=int, required=True)
@@ -35,6 +37,7 @@ def register(subparsers):
 
     p = sub.add_parser("delete-item")
     p.add_argument("--id", type=int, required=True)
+    add_destructive_flags(p)
 
     p = sub.add_parser("assign-location")
     p.add_argument("--id", type=int, required=True)
@@ -56,7 +59,8 @@ def handle(args, client: WPClient, config):
     elif args.action == "create":
         print(json_output(menus.create(name=args.name, locations=_csv(args.locations))))
     elif args.action == "delete":
-        print(json_output(menus.delete(args.id)))
+        if confirm_or_exit(args, f"delete menu {args.id}"):
+            print(json_output(menus.delete(args.id)))
     elif args.action == "items":
         print(json_output(menus.list_items(args.menu_id)))
     elif args.action == "add-item":
@@ -64,6 +68,7 @@ def handle(args, client: WPClient, config):
             menu_id=args.menu_id, title=args.title, url=args.url, object_id=args.object_id,
             item_type=args.item_type, object_name=args.object_name, parent=args.parent)))
     elif args.action == "delete-item":
-        print(json_output(menus.delete_item(args.id)))
+        if confirm_or_exit(args, f"delete menu item {args.id}"):
+            print(json_output(menus.delete_item(args.id)))
     elif args.action == "assign-location":
         print(json_output(menus.assign_location(args.id, _csv(args.locations))))

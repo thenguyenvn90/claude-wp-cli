@@ -1,9 +1,11 @@
 """CLI subcommand for WordPress pages."""
 
-from pathlib import Path
-from client.http import WPClient, json_output
+from client.http import WPClient, json_output, error_output
 from client.pages import PagesClient
+from client.posts import PostsClient
 from converter.markdown import convert_markdown
+from client.guards import safe_read_text
+from ._safety import add_destructive_flags, confirm_or_exit
 
 
 def register(subparsers):
@@ -33,10 +35,19 @@ def register(subparsers):
     p.add_argument("--status", default=None, dest="post_status")
     p.add_argument("--parent-id", type=int, default=None)
     p.add_argument("--template", default=None)
+    p.add_argument("--slug", default=None, help="expected slug; verified before AND after the write")
+    p.add_argument("--raw", action="store_true", help="bypass push-safe guards on the content write")
+    p.add_argument("--force", action="store_true", help="bypass markdown-leak refusal")
+    p.add_argument("--no-emdash-strip", action="store_true")
+    p.add_argument("--allow-drift", action="store_true")
+    p.add_argument("--no-drift-check", action="store_true")
+    p.add_argument("--expect-modified", default=None,
+                   help="refuse if the page's 'modified' changed since this timestamp")
 
     p = sub.add_parser("delete")
     p.add_argument("--id", type=int, required=True)
-    p.add_argument("--force", action="store_true")
+    p.add_argument("--force", action="store_true", help="hard delete (skip trash)")
+    add_destructive_flags(p)
 
     parser.set_defaults(func=handle)
 
@@ -53,16 +64,32 @@ def handle(args, client: WPClient, config):
     elif args.action == "create":
         content = None
         if args.content_file:
-            md = Path(args.content_file).read_text(encoding="utf-8")
-            content = convert_markdown(md, editor_type=wp_cfg.editor_type)
+            content = convert_markdown(safe_read_text(args.content_file), editor_type=wp_cfg.editor_type)
         data = pages.create(title=args.title, content=content or "", status=getattr(args, "post_status", None), parent_id=args.parent_id, template=args.template)
         print(json_output(data))
     elif args.action == "update":
         content = None
         if args.content_file:
-            md = Path(args.content_file).read_text(encoding="utf-8")
-            content = convert_markdown(md, editor_type=wp_cfg.editor_type)
-        data = pages.update(args.id, title=getattr(args, "title", None), content=content, status=getattr(args, "post_status", None), parent_id=getattr(args, "parent_id", None), template=getattr(args, "template", None))
-        print(json_output(data))
+            content = convert_markdown(safe_read_text(args.content_file), editor_type=wp_cfg.editor_type)
+        if content is not None and not args.raw:
+            # Pages get the SAME guarded write as posts (push_safe is post_type-parameterised).
+            res = PostsClient(client).push_safe(
+                args.id, content, expected_slug=args.slug, force=args.force,
+                strip_emdash=not args.no_emdash_strip, check_drift_enabled=not args.no_drift_check,
+                allow_drift=args.allow_drift, status=getattr(args, "post_status", None),
+                post_type="pages", expected_modified=args.expect_modified)
+            if not res.get("pushed"):
+                print(error_output("push_refused", res.get("refused", "refused"), 0))
+                raise SystemExit(2)
+            extra = {k: v for k, v in (
+                ("title", args.title), ("parent_id", getattr(args, "parent_id", None)),
+                ("template", getattr(args, "template", None))) if v is not None}
+            if extra:
+                pages.update(args.id, **extra)
+            print(json_output(res))
+        else:
+            data = pages.update(args.id, title=getattr(args, "title", None), content=content, status=getattr(args, "post_status", None), parent_id=getattr(args, "parent_id", None), template=getattr(args, "template", None))
+            print(json_output(data))
     elif args.action == "delete":
-        print(json_output(pages.delete(args.id, force=args.force)))
+        if confirm_or_exit(args, f"delete page {args.id}" + (" (hard delete)" if args.force else "")):
+            print(json_output(pages.delete(args.id, force=args.force)))

@@ -1,9 +1,8 @@
 """CLI subcommand for the guarded publish path (parity with wp_push_safe / wp_fetch_live)."""
 
-from pathlib import Path
-
 from client.http import WPClient, json_output, error_output
 from client.posts import PostsClient
+from client.guards import safe_read_text, FileTooLargeError
 
 
 def register(subparsers):
@@ -21,6 +20,9 @@ def register(subparsers):
     p.add_argument("--no-emdash-strip", action="store_true")
     p.add_argument("--allow-drift", action="store_true")
     p.add_argument("--no-drift-check", action="store_true")
+    p.add_argument("--expect-modified", default=None,
+                   help="refuse if the post's 'modified' changed since this timestamp "
+                        "(capture it from `publish fetch` for a safe edit-then-push)")
 
     p = sub.add_parser("fetch", help="Fetch live raw content before editing")
     p.add_argument("--id", type=int, required=True)
@@ -38,11 +40,14 @@ def handle(args, client: WPClient, config):
         return
 
     # action == push
-    path = Path(args.content_file)
-    if not path.is_file():
-        print(error_output("file_not_found", f"Content file not found: {path}", 0))
+    try:
+        content = safe_read_text(args.content_file)
+    except FileNotFoundError:
+        print(error_output("file_not_found", f"Content file not found: {args.content_file}", 0))
         raise SystemExit(2)
-    content = path.read_text(encoding="utf-8")
+    except FileTooLargeError as e:
+        print(error_output("file_too_large", str(e), 0))
+        raise SystemExit(2)
     result = posts.push_safe(
         args.id, content,
         expected_slug=args.slug,
@@ -52,6 +57,7 @@ def handle(args, client: WPClient, config):
         allow_drift=args.allow_drift,
         status=args.status,
         post_type=post_type,
+        expected_modified=args.expect_modified,
     )
     if result.get("pushed"):
         print(json_output(result))

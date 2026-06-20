@@ -17,7 +17,57 @@ tests assert that.
 
 from __future__ import annotations
 
+import os
 import re
+import stat
+import sys
+from pathlib import Path
+
+
+# File-read caps — a hostile/huge path (e.g. an LLM-supplied --content-file) should not be
+# read unbounded into memory or pushed wholesale (CWE-400).
+MAX_CONTENT_BYTES = 25 * 1024 * 1024   # HTML body / schema JSON
+MAX_MEDIA_BYTES = 64 * 1024 * 1024     # media uploads
+
+
+class FileTooLargeError(ValueError):
+    """Raised when a file to read/upload exceeds its size cap."""
+
+
+def safe_read_text(path, *, max_bytes: int = MAX_CONTENT_BYTES) -> str:
+    """Read a text file with a size cap (CWE-400). Raises FileNotFoundError / FileTooLargeError."""
+    p = Path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"file not found: {path}")
+    size = p.stat().st_size
+    if size > max_bytes:
+        raise FileTooLargeError(f"{path} is {size} bytes, over the {max_bytes}-byte limit")
+    return p.read_text(encoding="utf-8")
+
+
+def safe_read_bytes(path, *, max_bytes: int = MAX_MEDIA_BYTES) -> bytes:
+    """Read a binary file with a size cap (CWE-400). Raises FileNotFoundError / FileTooLargeError."""
+    p = Path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"file not found: {path}")
+    size = p.stat().st_size
+    if size > max_bytes:
+        raise FileTooLargeError(f"{path} is {size} bytes, over the {max_bytes}-byte limit")
+    return p.read_bytes()
+
+
+def warn_if_world_readable(path) -> None:
+    """POSIX: warn (stderr, no secret) if a credential file is group/other readable/writable
+    (CWE-312). No-op on Windows, whose mode bits don't carry POSIX permissions."""
+    if os.name == "nt":
+        return
+    try:
+        mode = os.stat(path).st_mode
+    except OSError:
+        return
+    if mode & (stat.S_IRGRP | stat.S_IROTH | stat.S_IWGRP | stat.S_IWOTH):
+        print(f"warning: credential file {path} is accessible by group/other; "
+              f"run: chmod 600 {path}", file=sys.stderr)
 
 
 # (regex, name, threshold) — a pattern is a "leak" only at/above its threshold.

@@ -4,6 +4,7 @@ import json
 
 from client.http import WPClient, json_output
 from client.settings import SettingsClient
+from ._safety import add_destructive_flags, confirm_or_exit
 
 
 def register(subparsers):
@@ -17,6 +18,7 @@ def register(subparsers):
     p = sub.add_parser("set")
     p.add_argument("--key", required=True)
     p.add_argument("--value", required=True, help="Parsed as JSON when possible, else string")
+    add_destructive_flags(p)  # a site-option overwrite can change site behavior
 
     parser.set_defaults(func=handle)
 
@@ -36,4 +38,5 @@ def handle(args, client: WPClient, config):
         else:
             print(json_output(settings.get()))
     elif args.action == "set":
-        print(json_output(settings.update({args.key: _parse(args.value)})))
+        if confirm_or_exit(args, f"set site option {args.key!r}"):
+            print(json_output(settings.update({args.key: _parse(args.value)})))

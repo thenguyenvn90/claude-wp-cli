@@ -2,6 +2,7 @@
 
 from client.http import WPClient, json_output
 from client.comments import CommentsClient
+from ._safety import add_destructive_flags, confirm_or_exit
 
 
 def register(subparsers):
@@ -33,7 +34,8 @@ def register(subparsers):
 
     p = sub.add_parser("delete")
     p.add_argument("--id", type=int, required=True)
-    p.add_argument("--force", action="store_true")
+    p.add_argument("--force", action="store_true", help="hard delete (skip trash)")
+    add_destructive_flags(p)
 
     parser.set_defaults(func=handle)
 
@@ -55,4 +57,5 @@ def handle(args, client: WPClient, config):
     elif args.action == "create":
         print(json_output(comments.create(post=args.post, content=args.content, parent=args.parent)))
     elif args.action == "delete":
-        print(json_output(comments.delete(args.id, force=args.force)))
+        if confirm_or_exit(args, f"delete comment {args.id}" + (" (hard delete)" if args.force else "")):
+            print(json_output(comments.delete(args.id, force=args.force)))

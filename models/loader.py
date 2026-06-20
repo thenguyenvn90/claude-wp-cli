@@ -96,6 +96,8 @@ class SiteRegistry:
         # Load secrets from .env.site
         env_site_path = site_dir / ".env.site"
         if env_site_path.is_file():
+            from client.guards import warn_if_world_readable
+            warn_if_world_readable(env_site_path)
             env_values = dotenv_values(env_site_path)
             wp_secrets = WordPressSecrets(
                 wp_username=env_values.get("WP_USERNAME", ""),

@@ -2,6 +2,7 @@
 
 from client.http import WPClient, json_output
 from client.media import MediaClient
+from ._safety import add_destructive_flags, confirm_or_exit
 
 
 def register(subparsers):
@@ -23,12 +24,15 @@ def register(subparsers):
     p.add_argument("--caption", default=None)
     p.add_argument("--title", default=None)
     p.add_argument("--filename", default=None, help="override the upload filename")
+    p.add_argument("--allow-svg", action="store_true",
+                   help="permit SVG upload (disabled by default — SVG can carry stored-XSS payloads)")
     p.add_argument("--featured", type=int, default=None, metavar="POST_ID",
                    help="also set the uploaded media as this post's featured image")
 
     p = sub.add_parser("delete")
     p.add_argument("--id", type=int, required=True)
-    p.add_argument("--force", action="store_true")
+    p.add_argument("--force", action="store_true", help="hard delete (skip trash)")
+    add_destructive_flags(p)
 
     parser.set_defaults(func=handle)
 
@@ -43,10 +47,11 @@ def handle(args, client: WPClient, config):
         print(json_output(media.get(args.id)))
     elif args.action == "upload":
         data = media.upload(args.file, alt_text=args.alt_text, caption=args.caption,
-                            title=args.title, filename=args.filename)
+                            title=args.title, filename=args.filename, allow_svg=args.allow_svg)
         if args.featured is not None and data.get("id"):
             media.set_featured(args.featured, data["id"])
             data["featured_set_on"] = args.featured
         print(json_output(data))
     elif args.action == "delete":
-        print(json_output(media.delete(args.id, force=args.force)))
+        if confirm_or_exit(args, f"delete media {args.id}" + (" (hard delete)" if args.force else "")):
+            print(json_output(media.delete(args.id, force=args.force)))

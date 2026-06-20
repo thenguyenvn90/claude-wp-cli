@@ -2,6 +2,7 @@
 
 from client.http import WPClient, json_output
 from client.taxonomy import TaxonomyClient
+from ._safety import add_destructive_flags, confirm_or_exit
 
 
 def register(subparsers):
@@ -22,6 +23,7 @@ def register(subparsers):
 
     p = cat_sub.add_parser("delete")
     p.add_argument("--id", type=int, required=True)
+    add_destructive_flags(p)
 
     tag_parser = sub.add_parser("tags")
     tag_sub = tag_parser.add_subparsers(dest="action")
@@ -35,6 +37,7 @@ def register(subparsers):
 
     p = tag_sub.add_parser("delete")
     p.add_argument("--id", type=int, required=True)
+    add_destructive_flags(p)
 
     parser.set_defaults(func=handle)
 
@@ -48,7 +51,8 @@ def handle(args, client: WPClient, config):
         elif args.action == "create":
             print(json_output(tax.create_category(name=args.name, parent_id=args.parent_id)))
         elif args.action == "delete":
-            print(json_output(tax.delete_category(args.id)))
+            if confirm_or_exit(args, f"delete category {args.id}"):
+                print(json_output(tax.delete_category(args.id)))
     elif args.tax_type == "tags":
         if args.action == "list":
             data, total, pages = tax.list_tags(per_page=args.per_page)
@@ -56,4 +60,5 @@ def handle(args, client: WPClient, config):
         elif args.action == "create":
             print(json_output(tax.create_tag(name=args.name)))
         elif args.action == "delete":
-            print(json_output(tax.delete_tag(args.id)))
+            if confirm_or_exit(args, f"delete tag {args.id}"):
+                print(json_output(tax.delete_tag(args.id)))

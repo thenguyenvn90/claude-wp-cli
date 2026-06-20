@@ -12,9 +12,17 @@ class SchemaClient:
     def get(self, *, post_id: int) -> dict:
         return self._client.get(f"posts/{post_id}", params={"context": "edit", "_fields": "id,meta"})
 
-    def push(self, *, post_id: int, schema_data: dict, seo_plugin: str) -> Optional[dict]:
+    def push(self, *, post_id: int, schema_data: dict, seo_plugin: str,
+             expected_slug: Optional[str] = None) -> Optional[dict]:
         if seo_plugin == "none":
             return None
+        # Guard against a wrong --post-id clobbering a different post (CWE-807): verify the
+        # slug before any write when the caller knows what it should be.
+        if expected_slug:
+            from .posts import PostsClient
+            ok, actual, msg = PostsClient(self._client).verify_slug(post_id, expected_slug)
+            if not ok:
+                raise ValueError(msg)
         schema_str = json.dumps(schema_data)
         if seo_plugin == "yoast":
             return self._client.post(f"posts/{post_id}", json={"meta": {"_yoast_wpseo_schema_json": schema_str}})
@@ -41,8 +49,10 @@ class SchemaClient:
         faq_block = '<!-- wp:rank-math/faq-block --><div class="wp-block-rank-math-faq-block">' + "".join(faq_items) + "</div><!-- /wp:rank-math/faq-block -->"
         current = self._client.get(f"posts/{post_id}", params={"context": "edit", "_fields": "id,content"})
         current_content = current["content"]["raw"]
+        # Strip a PREVIOUS tool-written FAQ block, anchored to its exact comment delimiters so the
+        # regex can't greedily eat adjacent markup (the old `.*?</div></div>` pattern could over-match).
         current_content = re.sub(
-            r'(?:<!-- wp:rank-math/faq-block -->)?\s*<div class="wp-block-rank-math-faq-block">.*?</div>\s*</div>\s*(?:<!-- /wp:rank-math/faq-block -->)?',
+            r'<!-- wp:rank-math/faq-block -->.*?<!-- /wp:rank-math/faq-block -->\s*',
             "", current_content, flags=re.DOTALL
         ).rstrip()
         return self._client.post(f"posts/{post_id}", json={"content": current_content + "\n" + faq_block})

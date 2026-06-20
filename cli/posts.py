@@ -1,11 +1,10 @@
 """CLI subcommand for WordPress posts."""
 
-from pathlib import Path
-from typing import Optional
-
-from client.http import WPClient, json_output
+from client.http import WPClient, json_output, error_output
 from client.posts import PostsClient
 from converter.markdown import convert_markdown
+from client.guards import safe_read_text
+from ._safety import add_destructive_flags, confirm_or_exit
 
 
 def register(subparsers):
@@ -37,10 +36,20 @@ def register(subparsers):
     p.add_argument("--status", default=None, dest="post_status")
     p.add_argument("--date", default=None, help="Publish date (ISO 8601, e.g. 2026-03-20T10:00:00)")
     p.add_argument("--featured-media", type=int, default=None, help="Media ID for featured image")
+    # Content writes default to the guarded path (slug-guard, md-leak, drift, em-dash strip).
+    p.add_argument("--slug", default=None, help="expected slug; verified before AND after the write")
+    p.add_argument("--raw", action="store_true", help="bypass push-safe guards on the content write")
+    p.add_argument("--force", action="store_true", help="bypass markdown-leak refusal")
+    p.add_argument("--no-emdash-strip", action="store_true")
+    p.add_argument("--allow-drift", action="store_true")
+    p.add_argument("--no-drift-check", action="store_true")
+    p.add_argument("--expect-modified", default=None,
+                   help="refuse if the post's 'modified' changed since this timestamp (from publish fetch)")
 
     p = sub.add_parser("delete")
     p.add_argument("--id", type=int, required=True)
-    p.add_argument("--force", action="store_true")
+    p.add_argument("--force", action="store_true", help="hard delete (skip trash)")
+    add_destructive_flags(p)
 
     p = sub.add_parser("revisions")
     p.add_argument("--id", type=int, required=True)
@@ -57,7 +66,7 @@ def _parse_ids(value):
 def _load_content(content_file, editor_type):
     if not content_file:
         return None
-    md_text = Path(content_file).read_text(encoding="utf-8")
+    md_text = safe_read_text(content_file)
     return convert_markdown(md_text, editor_type=editor_type)
 
 
@@ -76,9 +85,30 @@ def handle(args, client: WPClient, config):
         print(json_output(data))
     elif args.action == "update":
         content = _load_content(getattr(args, "content_file", None), wp_cfg.editor_type)
-        data = posts.update(args.id, title=getattr(args, "title", None), content=content, status=getattr(args, "post_status", None), date=getattr(args, "date", None), featured_media=getattr(args, "featured_media", None))
-        print(json_output(data))
+        if content is not None and not args.raw:
+            # Guarded content write (the common path): slug-guard + md-leak + drift + em-dash.
+            res = posts.push_safe(
+                args.id, content, expected_slug=args.slug, force=args.force,
+                strip_emdash=not args.no_emdash_strip, check_drift_enabled=not args.no_drift_check,
+                allow_drift=args.allow_drift, status=getattr(args, "post_status", None),
+                post_type="posts", expected_modified=args.expect_modified)
+            if not res.get("pushed"):
+                print(error_output("push_refused", res.get("refused", "refused"), 0))
+                raise SystemExit(2)
+            # Non-content fields (title/date/featured) still go through a normal update.
+            extra = {k: v for k, v in (
+                ("title", args.title), ("date", getattr(args, "date", None)),
+                ("featured_media", getattr(args, "featured_media", None))) if v is not None}
+            if extra:
+                posts.update(args.id, **extra)
+            print(json_output(res))
+        else:
+            data = posts.update(args.id, title=getattr(args, "title", None), content=content,
+                                status=getattr(args, "post_status", None), date=getattr(args, "date", None),
+                                featured_media=getattr(args, "featured_media", None))
+            print(json_output(data))
     elif args.action == "delete":
-        print(json_output(posts.delete(args.id, force=args.force)))
+        if confirm_or_exit(args, f"delete post {args.id}" + (" (hard delete)" if args.force else "")):
+            print(json_output(posts.delete(args.id, force=args.force)))
     elif args.action == "revisions":
         print(json_output(posts.revisions(args.id)))

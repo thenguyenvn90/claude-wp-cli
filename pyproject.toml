@@ -7,13 +7,16 @@ name = "wp-cli"
 version = "1.0.0"
 description = "WordPress management CLI for Claude Code"
 requires-python = ">=3.10"
+# Upper bounds cap each dependency to the major line this tool is tested against, so an
+# unattended `pip install` can't silently pull an untested breaking major (supply-chain hygiene).
+# For reproducible installs, generate a hash-pinned lock file (e.g. `pip-compile --generate-hashes`).
 dependencies = [
-    "httpx>=0.27",
-    "pydantic>=2.5",
-    "pydantic-settings>=2.1",
-    "pyyaml>=6.0",
-    "python-dotenv>=1.0",
-    "markdown>=3.5",
+    "httpx>=0.27,<1",
+    "pydantic>=2.5,<3",
+    "pydantic-settings>=2.1,<3",
+    "pyyaml>=6.0,<7",
+    "python-dotenv>=1.0,<2",
+    "markdown>=3.5,<4",
 ]
 
 [project.optional-dependencies]
