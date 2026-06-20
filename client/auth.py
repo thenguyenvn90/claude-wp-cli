@@ -65,17 +65,34 @@ def _auth_from_mcp_json(host: str) -> tuple[str, str]:
     return "", ""
 
 
+def _auth_from_cfg(cfg: dict) -> str:
+    """Basic auth header from a wp-auth cfg dict — a pre-built ``auth`` (``Basic <base64>``),
+    or ``username`` + ``app_password``/``password`` (App Password spaces are stripped, so it can
+    be pasted exactly as WordPress shows it)."""
+    auth = cfg.get("auth")
+    if auth:
+        return auth
+    user = cfg.get("username") or cfg.get("wp_username")
+    pw = cfg.get("app_password") or cfg.get("password")
+    if user and pw:
+        token = base64.b64encode(f"{user}:{pw.replace(' ', '')}".encode("utf-8")).decode("ascii")
+        return f"Basic {token}"
+    raise MissingCredentialsError(
+        'wp-auth.json needs either "auth" (Basic <base64>) or "username" + "app_password"'
+    )
+
+
 def resolve_auth(site: str | None = None, site_config_path: str | None = None) -> tuple[str, str]:
     """Resolve (rest_base, auth_header). Raises MissingCredentialsError if none found."""
     if site_config_path:
         cfg = json.loads(Path(site_config_path).read_text(encoding="utf-8"))
-        return _normalise_base(cfg["wp_base"]), cfg["auth"]
+        return _normalise_base(cfg["wp_base"]), _auth_from_cfg(cfg)
 
     if site:
         candidate = Path("sites") / site / "wp-auth.json"
         if candidate.is_file():
             cfg = json.loads(candidate.read_text(encoding="utf-8"))
-            return _normalise_base(cfg["wp_base"]), cfg["auth"]
+            return _normalise_base(cfg["wp_base"]), _auth_from_cfg(cfg)
 
     wp_base = os.environ.get("CLAUDE_WP_BASE")
     auth = os.environ.get("CLAUDE_WP_AUTH")
